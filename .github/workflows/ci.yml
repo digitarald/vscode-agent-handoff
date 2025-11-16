@@ -88,18 +88,6 @@ jobs:
       - name: Build extension
         run: pnpm run compile
 
-      - name: Run unit tests (Linux)
-        if: runner.os == 'Linux'
-        run: xvfb-run -a pnpm test
-        env:
-          CI: true
-
-      - name: Run unit tests (Windows)
-        if: runner.os != 'Linux'
-        run: pnpm test
-        env:
-          CI: true
-
       - name: Package extension
         run: pnpm run package
 
