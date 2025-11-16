@@ -1,0 +1,76 @@
+{
+  "name": "agent-handoff",
+  "displayName": "Agent Handoff",
+  "description": "Context engineering tools and workflows for AI agent collaboration",
+  "publisher": "digitarald",
+  "version": "0.0.1",
+  "preview": true,
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/digitarald/vscode-agent-handoff"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.106.0"
+  },
+  "categories": [
+    "AI",
+    "Chat"
+  ],
+  "activationEvents": [
+    "onLanguageModelTool:handoff"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languageModelTools": [
+      {
+        "name": "handoff",
+        "icon": "$(send)",
+        "toolReferenceName": "handoff",
+        "canBeReferencedInPrompt": true,
+        "displayName": "handoff",
+        "userDescription": "Analyzes the current conversation thread and creates a new focused thread for continuing work.",
+        "modelDescription": "Analyzes the current conversation thread and creates a new focused thread for continuing work. Rather than compressing or summarizing the existing context, this tool extracts relevant information and generates a transition to a fresh agent thread.\n\n**When to use:** ONLY when the user explicitly requests a handoff (e.g., 'handoff to...', 'create new thread for...', 'start fresh chat to...').\n\n**Behavior:**\n1. Analyze the current thread to understand the conversation history, decisions made, code changes, and artifacts created\n2. Identify files, code snippets, and context elements that are relevant to the specified goal\n3. Generate a draft prompt that:\n   - Summarizes the relevant background from the current thread\n   - States the clear goal for the new thread\n   - References specific files and artifacts to carry forward\n   - Excludes outdated or irrelevant context",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "newPrompt": {
+              "type": "string",
+              "description": "The initial prompt for the new chat thread with goal, context, and constraints."
+            }
+          },
+          "required": [
+            "newPrompt"
+          ]
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run package",
+    "compile": "pnpm run check-types && pnpm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "pnpm run check-types && pnpm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "pnpm run compile-tests && pnpm run compile && pnpm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.106.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.46.3",
+    "eslint": "^9.39.1",
+    "typescript": "^5.9.3",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "esbuild": "^0.25.6",
+    "npm-run-all": "^4.1.5"
+  }
+}

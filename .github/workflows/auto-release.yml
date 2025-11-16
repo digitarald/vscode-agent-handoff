@@ -1,0 +1,166 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: Run CI
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Create Release
+    needs: ci
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for changes since last release
+        id: check_changes
+        run: |
+          LATEST_RELEASE_TAG=$(git tag -l | grep -E '^v[0-9]+\.[02468]+\.[0-9]+$' | sort -V | tail -1 || echo "")
+
+          if [[ -z "$LATEST_RELEASE_TAG" ]]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            COMMITS_SINCE_RELEASE=$(git rev-list --count "$LATEST_RELEASE_TAG"..HEAD)
+            
+            if [[ $COMMITS_SINCE_RELEASE -gt 0 ]]; then
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+            else
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Skip message
+        if: steps.check_changes.outputs.has_changes != 'true'
+        run: |
+          echo "::notice::No changes detected since last release."
+
+      - name: Setup pnpm
+        if: steps.check_changes.outputs.has_changes == 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Generate version
+        if: steps.check_changes.outputs.has_changes == 'true'
+        id: version
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          
+          TIMESTAMP_PATCH=$(date -u +"%m%d%H%M")
+          
+          if (( MINOR % 2 == 1 )); then
+            NEW_VERSION="${MAJOR}.${MINOR}.${TIMESTAMP_PATCH}"
+          else
+            NEW_MINOR=$((MINOR + 1))
+            NEW_VERSION="${MAJOR}.${NEW_MINOR}.${TIMESTAMP_PATCH}"
+          fi
+
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Use Node.js
+        if: steps.check_changes.outputs.has_changes == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Build extension
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: pnpm run compile
+
+      - name: Install vsce
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: pnpm add -g @vscode/vsce
+
+      - name: Update package.json version
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+
+      - name: Package VSIX
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          vsce package --pre-release --no-git-tag-version --allow-missing-repository
+          ls -la *.vsix
+
+      - name: Create tag
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+
+          if ! git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            git tag -a "v${{ steps.version.outputs.version }}" -m "Pre-release v${{ steps.version.outputs.version }}"
+            git push origin "v${{ steps.version.outputs.version }}"
+          fi
+
+      - name: Generate changelog
+        if: steps.check_changes.outputs.has_changes == 'true'
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          echo "## What's Changed" > changelog.md
+          echo "" >> changelog.md
+
+          if [[ -n "$PREV_TAG" ]]; then
+            git log --pretty=format:"* %s (%h)" "$PREV_TAG"..HEAD >> changelog.md
+          else
+            git log --pretty=format:"* %s (%h)" >> changelog.md
+          fi
+
+          echo "" >> changelog.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...v${{ steps.version.outputs.version }}" >> changelog.md
+
+      - name: Create GitHub Release
+        if: steps.check_changes.outputs.has_changes == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }} (Pre-release)
+          files: "*.vsix"
+          body_path: changelog.md
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to VS Code Marketplace
+        if: steps.check_changes.outputs.has_changes == 'true' && env.VSCE_PAT != ''
+        run: |
+          VSIX_FILE=$(ls *.vsix | head -1)
+          vsce publish --pre-release --packagePath "$VSIX_FILE"
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Summary
+        if: always()
+        run: |
+          if [[ "${{ steps.check_changes.outputs.has_changes }}" == "true" ]]; then
+            echo "## ✅ Release Created" >> $GITHUB_STEP_SUMMARY
+            echo "Successfully created pre-release v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ✅ No Changes" >> $GITHUB_STEP_SUMMARY
+            echo "No changes detected since last release." >> $GITHUB_STEP_SUMMARY
+          fi

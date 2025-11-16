@@ -1,0 +1,137 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., 0.1.0)"
+        required: true
+        type: string
+      prerelease:
+        description: "Mark as pre-release"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "pnpm"
+
+      - name: Validate version format
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Invalid version format. Use semantic versioning (e.g., 0.1.0)"
+            exit 1
+          fi
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Determine if prerelease
+          if (( $(echo "$VERSION" | cut -d'.' -f2) % 2 == 1 )) || [[ "${{ inputs.prerelease }}" == "true" ]]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: xvfb-run -a pnpm test
+
+      - name: Build extension
+        run: pnpm run compile
+
+      - name: Install vsce
+        run: pnpm add -g @vscode/vsce
+
+      - name: Package VSIX
+        run: |
+          if [[ "${{ steps.version.outputs.prerelease }}" == "true" ]]; then
+            vsce package --pre-release --no-git-tag-version --allow-missing-repository
+          else
+            vsce package --no-git-tag-version --allow-missing-repository
+          fi
+          ls -la *.vsix
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-vsix-${{ steps.version.outputs.version }}
+          path: "*.vsix"
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "*.vsix"
+          generate_release_notes: true
+          body: |
+            ## Installation
+
+            ### VS Code Marketplace
+            Install directly from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=digitarald.agent-handoff)
+
+            ### Manual Installation
+            1. Download the VSIX file from the assets below
+            2. Open VS Code
+            3. Go to Extensions (Ctrl+Shift+X)
+            4. Click "..." and select "Install from VSIX..."
+            5. Select the downloaded file
+          draft: false
+          prerelease: ${{ steps.version.outputs.prerelease }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to VS Code Marketplace
+        if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && env.VSCE_PAT != ''
+        run: |
+          echo "Publishing version ${{ steps.version.outputs.version }}..."
+          if [[ "${{ steps.version.outputs.prerelease }}" == "true" ]]; then
+            vsce publish --pre-release --no-git-tag-version
+          else
+            vsce publish --no-git-tag-version
+          fi
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Post-release notification
+        if: always()
+        run: |
+          if [[ "${{ job.status }}" == "success" ]]; then
+            echo "✅ Release ${{ steps.version.outputs.version }} completed successfully!"
+          else
+            echo "❌ Release failed. Check the logs."
+          fi

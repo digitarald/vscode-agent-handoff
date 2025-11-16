@@ -1,0 +1,192 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - main
+      - "release/**"
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check-skip:
+    name: Check if CI should run
+    runs-on: ubuntu-latest
+    outputs:
+      should-run: ${{ steps.check.outputs.should_run }}
+    steps:
+      - name: Determine if CI should run
+        id: check
+        run: |
+          # Skip CI on main branch pushes (auto-release will handle it)
+          # Always run CI for PRs and other branches
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "::notice::Skipping standalone CI - auto-release workflow will handle testing"
+          else
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          fi
+
+  ci-skip-message:
+    name: CI Skipped - Auto-release will handle testing
+    needs: check-skip
+    if: needs.check-skip.outputs.should-run == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip message
+        run: |
+          echo "## ✅ CI Workflow Completed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "CI was skipped for this main branch push because the auto-release workflow will handle testing." >> $GITHUB_STEP_SUMMARY
+
+  test:
+    name: CI Test on ${{ matrix.os }} with Node ${{ matrix.node }}
+    needs: check-skip
+    if: needs.check-skip.outputs.should-run == 'true' || github.event_name == 'workflow_call'
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ["22.x"]
+        include:
+          - os: ubuntu-latest
+            os_name: Linux
+          - os: windows-latest
+            os_name: Windows
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Use Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check types
+        run: pnpm run check-types
+
+      - name: Lint code
+        run: pnpm run lint
+
+      - name: Build extension
+        run: pnpm run compile
+
+      - name: Run unit tests (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a pnpm test
+        env:
+          CI: true
+
+      - name: Run unit tests (Windows)
+        if: runner.os != 'Linux'
+        run: pnpm test
+        env:
+          CI: true
+
+      - name: Package extension
+        run: pnpm run package
+
+      - name: Install vsce
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '22.x'
+        run: pnpm add -g @vscode/vsce
+
+      - name: Create VSIX package
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '22.x'
+        run: vsce package --no-git-tag-version --allow-missing-repository
+
+      - name: Upload extension package
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '22.x'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-extension-package
+          path: "*.vsix"
+          retention-days: 7
+
+      - name: Comment PR with VSIX download link
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '22.x' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const runId = context.runId;
+            const prNumber = context.issue.number;
+            
+            const fs = require('fs');
+            const vsixFiles = fs.readdirSync('.').filter(file => file.endsWith('.vsix'));
+            const vsixFile = vsixFiles[0] || 'agent-handoff-*.vsix';
+            
+            const artifactUrl = `https://github.com/${owner}/${repo}/actions/runs/${runId}`;
+            
+            const comment = `## 📦 VSIX Package Ready for Testing
+            
+            **📁 Artifact:** \`${vsixFile}\`
+            **🔗 Download:** [View CI run and download artifact](${artifactUrl})
+            
+            ### How to test:
+            1. Download the \`vscode-extension-package\` artifact
+            2. Extract the zip file to get the \`.vsix\` file
+            3. Install in VS Code: \`Ctrl+Shift+P\` → "Extensions: Install from VSIX..."`;
+            
+            const comments = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number: prNumber,
+            });
+            
+            const botComment = comments.data.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('📦 VSIX Package Ready for Testing')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: comment
+              });
+            }
+
+  test-summary:
+    name: Test Summary
+    needs: [check-skip, test]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Check test results
+        run: |
+          echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.check-skip.outputs.should-run }}" == "false" ]]; then
+            echo "✅ Tests skipped - handled by auto-release workflow" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.test.result }}" == "success" ]]; then
+            echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Some tests failed. Please check the logs." >> $GITHUB_STEP_SUMMARY
+          fi
