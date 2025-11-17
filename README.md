@@ -23,6 +23,9 @@ Long AI conversations get cluttered. Agent Handoff lets AI assistants create fre
 
 ## Installation
 
+[![Install in VS Code](https://img.shields.io/badge/VS%20Code-Install-blue?logo=visual-studio-code)](https://vscode.dev/redirect?url=vscode:extension/digitarald.agent-handoff)
+[![Install in VS Code Insiders](https://img.shields.io/badge/VS%20Code%20Insiders-Install-green?logo=visual-studio-code)](https://insiders.vscode.dev/redirect?url=vscode:extension/digitarald.agent-handoff)
+
 Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=digitarald.agent-handoff) or search "Agent Handoff" in VS Code Extensions.
 
 ## Usage
