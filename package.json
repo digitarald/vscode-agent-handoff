@@ -23,6 +23,16 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Agent Handoff",
+      "properties": {
+        "agentHandoff.async": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "When enabled, handoffs create a notification instead of immediately opening a chat session. This allows you to review the prompt and decide whether to start the chat or open it in a file first."
+        }
+      }
+    },
     "chatPromptFiles": [
       {
         "name": "handoff",
@@ -45,10 +55,15 @@
             "newPrompt": {
               "type": "string",
               "description": "The initial prompt for the new chat thread with goal, context, and constraints."
+            },
+            "title": {
+              "type": "string",
+              "description": "Short title for the handoff, used to label the chat session."
             }
           },
           "required": [
-            "newPrompt"
+            "newPrompt",
+            "title"
           ]
         }
       }
