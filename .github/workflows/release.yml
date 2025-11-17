@@ -117,9 +117,9 @@ jobs:
         run: |
           echo "Publishing version ${{ steps.version.outputs.version }}..."
           if [[ "${{ steps.version.outputs.prerelease }}" == "true" ]]; then
-            vsce publish --pre-release --no-git-tag-version --allow-proposed-apis chatParticipantPrivate
+            vsce publish --pre-release --no-git-tag-version
           else
-            vsce publish --no-git-tag-version --allow-proposed-apis chatParticipantPrivate
+            vsce publish --no-git-tag-version
           fi
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
