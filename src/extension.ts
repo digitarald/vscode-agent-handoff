@@ -9,6 +9,14 @@ export function activate(context: vscode.ExtensionContext) {
 	const handoffTool = vscode.lm.registerTool<HandoffInput>(
 		'handoff',
 		{
+			prepareInvocation: async (
+				options: vscode.LanguageModelToolInvocationPrepareOptions<HandoffInput>,
+				_token: vscode.CancellationToken
+			) => {
+				return {
+					invocationMessage: `Handed off ${options.input.title}`
+				};
+			},
 			invoke: async (
 				options: vscode.LanguageModelToolInvocationOptions<HandoffInput>,
 				token: vscode.CancellationToken
