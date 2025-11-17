@@ -76,9 +76,9 @@ jobs:
       - name: Package VSIX
         run: |
           if [[ "${{ steps.version.outputs.prerelease }}" == "true" ]]; then
-            vsce package --pre-release --no-git-tag-version --allow-missing-repository --allow-proposed-apis chatParticipantPrivate
+            vsce package --pre-release --no-git-tag-version --allow-missing-repository
           else
-            vsce package --no-git-tag-version --allow-missing-repository --allow-proposed-apis chatParticipantPrivate
+            vsce package --no-git-tag-version --allow-missing-repository
           fi
           ls -la *.vsix
 

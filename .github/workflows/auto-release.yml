@@ -101,7 +101,7 @@ jobs:
       - name: Package VSIX
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          vsce package --pre-release --no-git-tag-version --allow-missing-repository --allow-proposed-apis chatParticipantPrivate
+          vsce package --pre-release --no-git-tag-version --allow-missing-repository
           ls -la *.vsix
 
       - name: Create tag
