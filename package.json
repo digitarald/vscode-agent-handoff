@@ -18,6 +18,9 @@
     "AI",
     "Chat"
   ],
+  "enabledApiProposals": [
+    "chatParticipantPrivate"
+  ],
   "activationEvents": [
     "onLanguageModelTool:handoff"
   ],
