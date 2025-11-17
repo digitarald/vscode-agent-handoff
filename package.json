@@ -23,6 +23,13 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "chatPromptFiles": [
+      {
+        "name": "handoff",
+        "description": "Creates a new focused thread focused on a specific goal",
+        "path": "./prompts/handoff.prompt.md"
+      }
+    ],
     "languageModelTools": [
       {
         "name": "handoff",
