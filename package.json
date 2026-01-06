@@ -48,7 +48,7 @@
         "canBeReferencedInPrompt": true,
         "displayName": "handoff",
         "userDescription": "Analyzes the current conversation thread and creates a new focused thread for continuing work.",
-        "modelDescription": "Analyzes the current conversation thread and creates a new focused thread for continuing work. Rather than compressing or summarizing the existing context, this tool extracts relevant information and generates a transition to a fresh agent thread.\n\n**When to use:** ONLY when the user explicitly requests a handoff (e.g., 'handoff to...', 'create new thread for...', 'start fresh chat to...').\n\n**Behavior:**\n1. Analyze the current thread to understand the conversation history, decisions made, code changes, and artifacts created\n2. Identify files, code snippets, and context elements that are relevant to the specified goal\n3. Generate a draft prompt that:\n   - Summarizes the relevant background from the current thread\n   - States the clear goal for the new thread\n   - References specific files and artifacts to carry forward\n   - Excludes outdated or irrelevant context",
+        "modelDescription": "Analyzes the current conversation thread and creates a new focused thread for continuing work. Rather than compressing or summarizing the existing context, this tool extracts relevant information and generates a transition to a fresh agent thread.\n\n**When to use:** ONLY when the user explicitly requests a handoff (e.g., 'handoff to...', 'create new thread for...', 'start fresh chat to...').\n\n**Behavior:**\n1. Analyze the current thread to understand the conversation history, decisions made, code changes, and artifacts created\n2. Identify files, code snippets, and context elements that are relevant to the specified goal\n3. Generate a draft prompt that:\n   - Summarizes the relevant background from the current thread\n   - States the clear goal for the new thread\n   - References specific files and artifacts to carry forward\n   - Excludes outdated or irrelevant context\n\n**Multi-agent collaboration:** Use the optional 'agent' parameter to route work to specialized agents (e.g., 'workspace' for codebase navigation, 'terminal' for command execution, or custom agents for specific domains). This enables workflows like: research → planning → implementation, where each phase is handled by the most suitable agent.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -59,6 +59,10 @@
             "title": {
               "type": "string",
               "description": "Short title for the handoff, used to label the chat session."
+            },
+            "agent": {
+              "type": "string",
+              "description": "Optional. The name of the specific chat participant/agent to handoff to (e.g., 'workspace', 'vscode', 'terminal'). If not specified, uses the default agent. This enables multi-agent collaboration by routing tasks to specialized agents."
             }
           },
           "required": [
