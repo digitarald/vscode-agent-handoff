@@ -6,6 +6,16 @@ interface HandoffInput {
 	agent?: string;
 }
 
+interface ChatOptions {
+	agentMode: boolean;
+	inputValue: string;
+	isPartialQuery: boolean;
+}
+
+function preparePromptWithAgent(prompt: string, agent?: string): string {
+	return agent ? `@${agent} ${prompt}` : prompt;
+}
+
 export function activate(context: vscode.ExtensionContext) {
 	const handoffTool = vscode.lm.registerTool<HandoffInput>(
 		'handoff',
@@ -34,14 +44,11 @@ export function activate(context: vscode.ExtensionContext) {
 							'Review in File'
 						).then(selection => {
 							if (selection === 'Start Chat') {
-								const chatOptions: any = {
+								const chatOptions: ChatOptions = {
 									agentMode: true,
-									inputValue: newPrompt,
+									inputValue: preparePromptWithAgent(newPrompt, agent),
 									isPartialQuery: true
 								};
-								if (agent) {
-									chatOptions.inputValue = `@${agent} ${newPrompt}`;
-								}
 								vscode.commands.executeCommand('workbench.action.chat.newChat', chatOptions);
 								// vscode.commands.executeCommand('workbench.action.chat.open', {
 								// 	query: newPrompt,
@@ -65,9 +72,8 @@ export function activate(context: vscode.ExtensionContext) {
 						]);
 					} else {
 						await vscode.commands.executeCommand('workbench.action.chat.newChat');
-						const query = agent ? `@${agent} ${newPrompt}` : newPrompt;
 						await vscode.commands.executeCommand('workbench.action.chat.open', {
-							query: query,
+							query: preparePromptWithAgent(newPrompt, agent),
 							isPartialQuery: true
 						});
 
