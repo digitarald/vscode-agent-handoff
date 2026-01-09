@@ -3,6 +3,17 @@ import * as vscode from 'vscode';
 interface HandoffInput {
 	newPrompt: string;
 	title: string;
+	agent?: string;
+}
+
+interface ChatOptions {
+	mode: string;
+	inputValue: string;
+	isPartialQuery: boolean;
+}
+
+function preparePromptWithAgent(prompt: string, agent?: string): string {
+	return agent ? `@${agent} ${prompt}` : prompt;
 }
 
 export function activate(context: vscode.ExtensionContext) {
@@ -21,7 +32,7 @@ export function activate(context: vscode.ExtensionContext) {
 				options: vscode.LanguageModelToolInvocationOptions<HandoffInput>,
 				token: vscode.CancellationToken
 			): Promise<vscode.LanguageModelToolResult> => {
-				const { newPrompt, title } = options.input;
+				const { newPrompt, title, agent } = options.input;
 				const config = vscode.workspace.getConfiguration('agentHandoff');
 				const asyncMode = config.get<boolean>('async', true);
 
@@ -33,11 +44,12 @@ export function activate(context: vscode.ExtensionContext) {
 							'Review in File'
 						).then(selection => {
 							if (selection === 'Start Chat') {
-								vscode.commands.executeCommand('workbench.action.chat.newChat', {
-									agentMode: true,
-									inputValue: newPrompt,
+								const chatOptions: ChatOptions = {
+									mode: 'agent',
+									inputValue: preparePromptWithAgent(newPrompt, agent),
 									isPartialQuery: true
-								});
+								};
+								vscode.commands.executeCommand('workbench.action.chat.newChat', chatOptions);
 								// vscode.commands.executeCommand('workbench.action.chat.open', {
 								// 	query: newPrompt,
 								// 	isPartialQuery: true
@@ -61,7 +73,7 @@ export function activate(context: vscode.ExtensionContext) {
 					} else {
 						await vscode.commands.executeCommand('workbench.action.chat.newChat');
 						await vscode.commands.executeCommand('workbench.action.chat.open', {
-							query: newPrompt,
+							query: preparePromptWithAgent(newPrompt, agent),
 							isPartialQuery: true
 						});
 

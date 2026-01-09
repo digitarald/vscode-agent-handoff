@@ -87,8 +87,9 @@ Edit `package.json` → `contributes.languageModelTools[0].inputSchema`
 ```json
 {
   "properties": {
-    "prompt": { "type": "string" },
-    "participant": { "type": "string" }  // New field
+    "newPrompt": { "type": "string" },
+    "title": { "type": "string" },
+    "agent": { "type": "string" }  // Optional field for multi-agent routing
   }
 }
 ```
@@ -97,13 +98,45 @@ Edit `package.json` → `contributes.languageModelTools[0].inputSchema`
 Edit `src/extension.ts` → `HandoffInput` interface
 ```typescript
 interface HandoffInput {
-    prompt: string;
-    participant?: string;  // New field
+    newPrompt: string;
+    title: string;
+    agent?: string;  // Optional field for targeting specific agents
 }
 ```
 
 **3. Implement Handler Logic**
 Modify `invoke` function in `src/extension.ts:20-50`
+
+### Multi-Agent Collaboration
+
+The extension now supports routing handoffs to specific chat participants/agents through the optional `agent` parameter. This enables multi-stage workflows where different specialized agents handle different phases of work.
+
+**Example workflow:**
+```
+Research phase (@workspace agent) 
+  → Planning phase (default agent)
+    → Implementation phase (@workspace agent)
+      → Testing phase (@terminal agent)
+```
+
+**Usage in tool calls:**
+```typescript
+// Handoff to workspace agent for code navigation
+handoff({
+  newPrompt: "Review the authentication module and identify areas for improvement",
+  title: "Code Review",
+  agent: "workspace"
+})
+
+// Handoff to terminal agent for command execution
+handoff({
+  newPrompt: "Run the test suite and fix any failing tests",
+  title: "Test Execution",
+  agent: "terminal"
+})
+```
+
+When the `agent` parameter is provided, the prompt is prefixed with `@{agent}` to direct the chat to the specified participant.
 
 ### Error Handling Pattern
 ```typescript

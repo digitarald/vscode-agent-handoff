@@ -19,6 +19,7 @@ Long AI conversations get cluttered. Agent Handoff lets AI assistants create fre
 - **Zero Configuration** - Works immediately with GitHub Copilot
 - **Smart Context Transfer** - AI extracts relevant information for new sessions
 - **Automatic Chat Spawning** - Opens new panels with contextual prompts
+- **Multi-Agent Routing** - Direct handoffs to specialized agents (@workspace, @terminal, etc.)
 - **LLM Tool Integration** - Registered as `handoff` tool for language models
 
 ## Installation
@@ -37,6 +38,21 @@ Once installed, simply ask GitHub Copilot to hand off work:
 - *"Hand this off to a new session focused on testing"*
 
 The AI will analyze your conversation, extract relevant context, and spawn a new focused chat session.
+
+### Multi-Agent Workflows
+
+The extension supports routing handoffs to specific chat participants/agents, enabling sophisticated multi-stage workflows:
+
+- *"Handoff to @workspace to review the authentication code"*
+- *"Create a handoff for @terminal to run the test suite"*
+- *"Start a new thread with @vscode for refactoring the settings"*
+
+**Example multi-agent workflow:**
+```
+Research (@workspace) → Planning (default) → Implementation (@workspace) → Testing (@terminal)
+```
+
+This allows different specialized agents to handle different phases automatically, making collaboration more efficient.
 
 ## Requirements
 
