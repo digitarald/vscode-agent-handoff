@@ -7,7 +7,7 @@ interface HandoffInput {
 }
 
 interface ChatOptions {
-	agentMode: boolean;
+	mode: string;
 	inputValue: string;
 	isPartialQuery: boolean;
 }
@@ -45,7 +45,7 @@ export function activate(context: vscode.ExtensionContext) {
 						).then(selection => {
 							if (selection === 'Start Chat') {
 								const chatOptions: ChatOptions = {
-									agentMode: true,
+									mode: 'agent',
 									inputValue: preparePromptWithAgent(newPrompt, agent),
 									isPartialQuery: true
 								};
